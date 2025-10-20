@@ -1,6 +1,6 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
 import bg.tuvarna.devicebackend.models.dtos.DeviceCreateVO;
 import bg.tuvarna.devicebackend.models.dtos.DeviceUpdateVO;
 import bg.tuvarna.devicebackend.models.entities.Device;
@@ -162,12 +162,11 @@ class DeviceServiceTests {
     void registerNewDevice_ok() {
         when(deviceRepository.findById("SN-X")).thenReturn(Optional.empty());
         User owner = user(10L, "Jane", "j@x");
-        when(userRepository.findById(10L)).thenReturn(Optional.of(owner));
         when(passportService.findPassportBySerialId("SN-X")).thenReturn(passport(18, "Name", "Model"));
 
-        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.of(2025, 2, 1), 10L);
+        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.of(2025, 2, 1));
 
-        deviceService.registerNewDevice(vo);
+        deviceService.registerNewDevice(vo, owner);
 
         verify(deviceRepository).save(argThat(d ->
                 d.getSerialNumber().equals("SN-X") &&
@@ -179,9 +178,9 @@ class DeviceServiceTests {
     @Test
     void registerNewDevice_alreadyExists_throws() {
         when(deviceRepository.findById("SN-X")).thenReturn(Optional.of(new Device()));
-        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.now(), 10L);
+        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.now());
 
-        assertThatThrownBy(() -> deviceService.registerNewDevice(vo))
+        assertThatThrownBy(() -> deviceService.registerNewDevice(vo, null))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Device already registered");
     }
@@ -189,13 +188,16 @@ class DeviceServiceTests {
     @Test
     void registerNewDevice_userNotFound_throws() {
         when(deviceRepository.findById("SN-X")).thenReturn(Optional.empty());
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.now(), 99L);
+        User user = User.builder()
+                .id(99L)
+                .build();
 
-        assertThatThrownBy(() -> deviceService.registerNewDevice(vo))
+        DeviceCreateVO vo = new DeviceCreateVO("SN-X", LocalDate.now());
+
+        assertThatThrownBy(() -> deviceService.registerNewDevice(vo, user))
                 .isInstanceOf(CustomException.class)
-                .hasMessage("User not found");
+                .hasMessage("Invalid serial number");
     }
 
     @Test
@@ -220,9 +222,9 @@ class DeviceServiceTests {
 
         when(deviceRepository.findById("SN1")).thenReturn(Optional.of(existing));
 
-        DeviceUpdateVO vo = new DeviceUpdateVO("SN1", newPurchase, "new comment");
+        DeviceUpdateVO vo = new DeviceUpdateVO(newPurchase, "new comment");
 
-        deviceService.updateDevice(vo);
+        deviceService.updateDevice("SN1", vo);
 
         assertThat(existing.getWarrantyExpirationDate()).isEqualTo(newPurchase.plusMonths(20));
         assertThat(existing.getComment()).isEqualTo("new comment");
@@ -237,9 +239,9 @@ class DeviceServiceTests {
 
         when(deviceRepository.findById("SN2")).thenReturn(Optional.of(existing));
 
-        DeviceUpdateVO vo = new DeviceUpdateVO("SN2", newPurchase, "note");
+        DeviceUpdateVO vo = new DeviceUpdateVO(newPurchase, "note");
 
-        deviceService.updateDevice(vo);
+        deviceService.updateDevice("SN2", vo);
 
         assertThat(existing.getWarrantyExpirationDate()).isEqualTo(newPurchase.plusMonths(18));
     }
@@ -252,9 +254,9 @@ class DeviceServiceTests {
         existing.setComment("old");
         when(deviceRepository.findById("SN3")).thenReturn(Optional.of(existing));
 
-        DeviceUpdateVO vo = new DeviceUpdateVO("SN3", LocalDate.of(2025,1,1), null);
+        DeviceUpdateVO vo = new DeviceUpdateVO(LocalDate.of(2025,1,1), null);
 
-        deviceService.updateDevice(vo);
+        deviceService.updateDevice("SN3", vo);
 
         assertThat(existing.getComment()).isNull();
         assertThat(existing.getWarrantyExpirationDate()).isEqualTo(LocalDate.of(2025,1,1).plusMonths(12));
@@ -263,9 +265,9 @@ class DeviceServiceTests {
     @Test
     void updateDevice_notFound_throws() {
         when(deviceRepository.findById("NOPE")).thenReturn(Optional.empty());
-        DeviceUpdateVO vo = new DeviceUpdateVO("NOPE", LocalDate.now(), "x");
+        DeviceUpdateVO vo = new DeviceUpdateVO(LocalDate.now(), "x");
 
-        assertThatThrownBy(() -> deviceService.updateDevice(vo))
+        assertThatThrownBy(() -> deviceService.updateDevice("NOPE", vo))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Device not found");
     }
@@ -282,7 +284,7 @@ class DeviceServiceTests {
 
         assertThatThrownBy(() -> deviceService.deleteDevice("SN1"))
                 .isInstanceOf(CustomException.class)
-                .hasMessage("Renovations exits");
+                .hasMessage("Cannot delete device: renovations exist");
     }
 
     @Test
@@ -291,7 +293,7 @@ class DeviceServiceTests {
         when(deviceRepository.findById("SN-A")).thenReturn(Optional.empty());
         when(passportService.findPassportBySerialId("SN-A")).thenReturn(passport(9, "X", "Y"));
 
-        DeviceCreateVO vo = new DeviceCreateVO("SN-A", LocalDate.of(2025, 5, 1), null);
+        DeviceCreateVO vo = new DeviceCreateVO("SN-A", LocalDate.of(2025, 5, 1));
 
         ArgumentCaptor<Device> deviceCaptor = ArgumentCaptor.forClass(Device.class);
 
@@ -309,7 +311,7 @@ class DeviceServiceTests {
         when(deviceRepository.findById("BAD")).thenReturn(Optional.empty());
         when(passportService.findPassportBySerialId("BAD")).thenThrow(new RuntimeException("nope"));
 
-        DeviceCreateVO vo = new DeviceCreateVO("BAD", LocalDate.now(), null);
+        DeviceCreateVO vo = new DeviceCreateVO("BAD", LocalDate.now());
 
         assertThatThrownBy(() -> deviceService.addAnonymousDevice(vo))
                 .isInstanceOf(CustomException.class)

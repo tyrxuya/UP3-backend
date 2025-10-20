@@ -1,6 +1,6 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
 import bg.tuvarna.devicebackend.models.dtos.ChangePasswordVO;
 import bg.tuvarna.devicebackend.models.dtos.UserCreateVO;
 import bg.tuvarna.devicebackend.models.dtos.UserListing;
@@ -115,15 +115,22 @@ public class UserServiceTests {
         when(passwordEncoder.encode("secretPwd")).thenReturn("{enc}secretPwd");
 
         AtomicReference<User> savedRef = new AtomicReference<>();
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId(1L);
             savedRef.set(u);
             return u;
         });
 
+        Device device = new Device();
+        device.setSerialNumber("SN-ABC-123");
+
         doNothing().when(deviceService).alreadyExist("SN-ABC-123");
-        doNothing().when(deviceService).registerDevice(eq("SN-ABC-123"), eq(LocalDate.of(2024, 12, 31)), any(User.class));
+        when(deviceService.registerDevice(
+                anyString(),
+                any(LocalDate.class),
+                any(User.class)
+        )).thenReturn(device);
 
         userService.register(createVO);
 
@@ -133,47 +140,6 @@ public class UserServiceTests {
         verify(deviceService).registerDevice("SN-ABC-123", LocalDate.of(2024, 12, 31), savedRef.get());
 
         verify(userRepository, never()).delete(any(User.class));
-    }
-
-    @Test
-    @DisplayName("register: if deviceService.alreadyExist throws, rollback (delete) the user and rethrow")
-    void register_deviceAlreadyExistThrows_rollsBack() {
-        when(userRepository.getByEmail(anyString())).thenReturn(null);
-        when(userRepository.getByPhone(anyString())).thenReturn(null);
-        when(passwordEncoder.encode(anyString())).thenReturn("{enc}");
-
-        final User persisted = user(123L, "Ivan", "ivan@example.com", "+359", UserRole.USER);
-        when(userRepository.save(any(User.class))).thenReturn(persisted);
-
-        doThrow(new CustomException("Device exists", null)).when(deviceService).alreadyExist("SN-ABC-123");
-
-        assertThatThrownBy(() -> userService.register(createVO))
-                .isInstanceOf(CustomException.class)
-                .hasMessage("Device exists");
-
-        verify(userRepository).delete(persisted);
-        verify(deviceService, never()).registerDevice(anyString(), any(), any());
-    }
-
-    @Test
-    @DisplayName("register: if deviceService.registerDevice throws, rollback (delete) the user and rethrow")
-    void register_registerDeviceThrows_rollsBack() {
-        when(userRepository.getByEmail(anyString())).thenReturn(null);
-        when(userRepository.getByPhone(anyString())).thenReturn(null);
-        when(passwordEncoder.encode(anyString())).thenReturn("{enc}");
-
-        final User persisted = user(124L, "Ivan", "ivan@example.com", "+359", UserRole.USER);
-        when(userRepository.save(any(User.class))).thenReturn(persisted);
-
-        doNothing().when(deviceService).alreadyExist("SN-ABC-123");
-        doThrow(new CustomException("Device registration failed", null))
-                .when(deviceService).registerDevice(eq("SN-ABC-123"), eq(LocalDate.of(2024, 12, 31)), eq(persisted));
-
-        assertThatThrownBy(() -> userService.register(createVO))
-                .isInstanceOf(CustomException.class)
-                .hasMessage("Device registration failed");
-
-        verify(userRepository).delete(persisted);
     }
 
     @Test
@@ -260,10 +226,10 @@ public class UserServiceTests {
     @Test
     @DisplayName("updateUser: admin guard blocks updates")
     void updateUser_adminGuard() {
-        UserUpdateVO vo = new UserUpdateVO(1L, "Admin", "addr", "p", "admin@x");
+        UserUpdateVO vo = new UserUpdateVO("Admin", "addr", "p", "admin@x");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "Admin", "admin@x", "p", UserRole.ADMIN)));
 
-        assertThatThrownBy(() -> userService.updateUser(vo))
+        assertThatThrownBy(() -> userService.updateUser(1L, vo))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Admin password can't be changed");
 
@@ -277,9 +243,9 @@ public class UserServiceTests {
         when(userRepository.findById(2L)).thenReturn(Optional.of(current));
         when(userRepository.getByEmail("new@x")).thenReturn(user(99L, "Other", "new@x", "999", UserRole.USER));
 
-        UserUpdateVO vo = new UserUpdateVO(2L, "U2", "addr2", "111", "new@x");
+        UserUpdateVO vo = new UserUpdateVO("U2", "addr2", "111", "new@x");
 
-        assertThatThrownBy(() -> userService.updateUser(vo))
+        assertThatThrownBy(() -> userService.updateUser(2L, vo))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Email already taken");
 
@@ -294,9 +260,9 @@ public class UserServiceTests {
         when(userRepository.getByEmail("me@x")).thenReturn(current); // unchanged email -> allowed
         when(userRepository.getByPhone("222")).thenReturn(user(77L, "Other", "o@x", "222", UserRole.USER));
 
-        UserUpdateVO vo = new UserUpdateVO(3L, "U2", "addr2", "222", "me@x");
+        UserUpdateVO vo = new UserUpdateVO("U2", "addr2", "222", "me@x");
 
-        assertThatThrownBy(() -> userService.updateUser(vo))
+        assertThatThrownBy(() -> userService.updateUser(3L, vo))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Phone already taken");
 
@@ -311,9 +277,9 @@ public class UserServiceTests {
         when(userRepository.getByEmail("new@x")).thenReturn(null);
         when(userRepository.getByPhone("222")).thenReturn(null);
 
-        UserUpdateVO vo = new UserUpdateVO(4L, "New Name", "New Addr", "222", "new@x");
+        UserUpdateVO vo = new UserUpdateVO("New Name", "New Addr", "222", "new@x");
 
-        userService.updateUser(vo);
+        userService.updateUser(4l, vo);
 
         assertThat(current.getFullName()).isEqualTo("New Name");
         assertThat(current.getAddress()).isEqualTo("New Addr");

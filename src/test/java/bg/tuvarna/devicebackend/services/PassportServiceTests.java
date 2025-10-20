@@ -1,6 +1,8 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.models.dtos.PassportCreateVO;
+import bg.tuvarna.devicebackend.models.dtos.PassportUpdateVO;
 import bg.tuvarna.devicebackend.models.dtos.PassportVO;
 import bg.tuvarna.devicebackend.models.entities.Passport;
 import bg.tuvarna.devicebackend.models.mappers.PassportMapper;
@@ -44,14 +46,10 @@ public class PassportServiceTests {
                 .build();
     }
 
-    private static PassportVO vo(Long id, String prefix, int from, int to, int months) {
-        return new PassportVO(id, "Name", "Model", prefix, months, from, to);
-    }
-
     @Test
     @DisplayName("save(create): no overlaps → toEntity + save")
     void save_create_ok() {
-        PassportVO req = vo(null, "SN-", 100, 199, 24);
+        PassportCreateVO req = new PassportCreateVO("ime", "model", "SN-", 24, 100, 199);
 
         when(passportRepository.findByFromSerialNumberBetween("SN-", 100, 199))
                 .thenReturn(List.of()); // no overlap
@@ -61,7 +59,7 @@ public class PassportServiceTests {
         try (MockedStatic<PassportMapper> ms = mockStatic(PassportMapper.class)) {
             ms.when(() -> PassportMapper.toEntity(req)).thenReturn(mapped);
 
-            passportService.save(req);
+            passportService.create(req);
 
             verify(passportRepository).save(mapped);
             ms.verify(() -> PassportMapper.toEntity(req));
@@ -71,11 +69,11 @@ public class PassportServiceTests {
     @Test
     @DisplayName("save(create): overlap exists → throws AlreadyExists")
     void save_create_overlap_throws() {
-        PassportVO req = vo(null, "SN-", 150, 250, 12);
+        PassportCreateVO req = new PassportCreateVO("ime", "model", "SN-", 12, 150, 250);
         when(passportRepository.findByFromSerialNumberBetween("SN-", 150, 250))
-                .thenReturn(List.of(passport(1L, "SN-", 100, 199, 12)));
+                .thenReturn(List.of(passport(1L, "SN-", 150, 250, 12)));
 
-        assertThatThrownBy(() -> passportService.save(req))
+        assertThatThrownBy(() -> passportService.create(req))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Serial number already exists");
 
@@ -86,16 +84,16 @@ public class PassportServiceTests {
     @DisplayName("save(update): overlaps only with itself → updateEntity + save")
     void save_update_ok_noConflict() {
         Passport existing = passport(10L, "SN-", 100, 199, 24);
-        PassportVO req = vo(10L, "SN-", 120, 220, 36);
+        PassportUpdateVO req = new PassportUpdateVO("ime", "model", "SN-", 24, 100, 199);
 
         when(passportRepository.findById(10L)).thenReturn(Optional.of(existing));
-        when(passportRepository.findByFromSerialNumberBetween("SN-", 120, 220))
+        when(passportRepository.findByFromSerialNumberBetween("SN-", 100, 199))
                 .thenReturn(List.of(existing));
 
         try (MockedStatic<PassportMapper> ms = mockStatic(PassportMapper.class)) {
             ms.when(() -> PassportMapper.updateEntity(existing, req)).then(inv -> null);
 
-            passportService.save(req);
+            passportService.update(10L, req);
 
             verify(passportRepository).save(existing);
             ms.verify(() -> PassportMapper.updateEntity(existing, req));
@@ -107,13 +105,12 @@ public class PassportServiceTests {
     void save_update_conflict_throws() {
         Passport existing = passport(10L, "SN-", 100, 199, 24);
         Passport other = passport(11L, "SN-", 180, 260, 12);
-        PassportVO req = vo(10L, "SN-", 150, 250, 24);
+        PassportCreateVO req = new PassportCreateVO("ime", "model", "SN-", 24, 150, 250);
 
-        when(passportRepository.findById(10L)).thenReturn(Optional.of(existing));
         when(passportRepository.findByFromSerialNumberBetween("SN-", 150, 250))
                 .thenReturn(List.of(other));
 
-        assertThatThrownBy(() -> passportService.save(req))
+        assertThatThrownBy(() -> passportService.create(req))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("Serial number already exists");
 

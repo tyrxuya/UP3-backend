@@ -1,7 +1,7 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorCode;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorCode;
 import bg.tuvarna.devicebackend.models.dtos.RenovationCreateVO;
 import bg.tuvarna.devicebackend.models.dtos.UserCreateVO;
 import bg.tuvarna.devicebackend.models.entities.Device;
