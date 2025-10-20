@@ -1,14 +1,13 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorCode;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorCode;
 import bg.tuvarna.devicebackend.models.dtos.DeviceCreateVO;
 import bg.tuvarna.devicebackend.models.dtos.DeviceUpdateVO;
 import bg.tuvarna.devicebackend.models.entities.Device;
 import bg.tuvarna.devicebackend.models.entities.Passport;
 import bg.tuvarna.devicebackend.models.entities.User;
 import bg.tuvarna.devicebackend.repositories.DeviceRepository;
-import bg.tuvarna.devicebackend.repositories.UserRepository;
 import bg.tuvarna.devicebackend.utils.CustomPage;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -23,9 +22,8 @@ import java.time.LocalDate;
 public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final PassportService passportService;
-    private final UserRepository userRepository;
 
-    public void registerDevice(String serialId, LocalDate purchaseDate, User user) {
+    public Device registerDevice(String serialId, LocalDate purchaseDate, User user) {
         try {
             Passport passport = passportService.findPassportBySerialId(serialId);
 
@@ -36,7 +34,7 @@ public class DeviceService {
             device.setPurchaseDate(purchaseDate);
             device.setWarrantyExpirationDate(purchaseDate.plusMonths(passport.getWarrantyMonths()).plusMonths(12));
 
-            deviceRepository.save(device);
+            return deviceRepository.save(device);
         } catch (RuntimeException e) {
             throw new CustomException("Invalid serial number", ErrorCode.Failed);
         }
@@ -52,10 +50,14 @@ public class DeviceService {
         return findDevice(id);
     }
 
-    public void registerNewDevice(DeviceCreateVO deviceCreateVO) {
+    public Device registerNewDevice(DeviceCreateVO deviceCreateVO, User user) {
         alreadyExist(deviceCreateVO.deviceSerialNumber());
-        User user = userRepository.findById(deviceCreateVO.userId()).orElseThrow(() -> new CustomException("User not found", ErrorCode.EntityNotFound));
-        registerDevice(deviceCreateVO.deviceSerialNumber(), deviceCreateVO.purchaseDate(), user);
+
+        if (user == null) {
+            throw new CustomException("User not found", ErrorCode.EntityNotFound);
+        }
+
+        return registerDevice(deviceCreateVO.deviceSerialNumber(), deviceCreateVO.purchaseDate(), user);
     }
 
     public void alreadyExist(String serialNumber) {
@@ -63,17 +65,22 @@ public class DeviceService {
             throw new CustomException("Device already registered", ErrorCode.AlreadyExists);
     }
 
-    public void updateDevice(DeviceUpdateVO device) {
-        Device deviceToUpdate = deviceRepository.findById(device.serialNumber()).orElseThrow(() -> new CustomException("Device not found", ErrorCode.EntityNotFound));
-        deviceToUpdate.setPurchaseDate(device.purchaseDate());
-        if (deviceToUpdate.getUser() == null)
-            deviceToUpdate.setWarrantyExpirationDate(device.purchaseDate().plusMonths(deviceToUpdate.getPassport().getWarrantyMonths()));
-        else
-            deviceToUpdate.setWarrantyExpirationDate(device.purchaseDate().plusMonths(deviceToUpdate.getPassport().getWarrantyMonths()).plusMonths(12));
+    public Device updateDevice(String serialNumber, DeviceUpdateVO device) {
+        Device deviceToUpdate = deviceRepository.findById(serialNumber).orElseThrow(() -> new CustomException("Device not found", ErrorCode.EntityNotFound));
 
+        deviceToUpdate.setPurchaseDate(device.purchaseDate());
+
+        LocalDate warrantyDate = device.purchaseDate().plusMonths(deviceToUpdate.getPassport().getWarrantyMonths());
+
+
+        if (deviceToUpdate.getUser() != null) {
+            warrantyDate = warrantyDate.plusMonths(12);
+        }
+
+        deviceToUpdate.setWarrantyExpirationDate(warrantyDate);
         deviceToUpdate.setComment(device.comment());
 
-        deviceRepository.save(deviceToUpdate);
+        return deviceRepository.save(deviceToUpdate);
     }
 
     @Transactional
@@ -81,11 +88,11 @@ public class DeviceService {
         try {
             deviceRepository.deleteBySerialNumber(serialNumber);
         } catch (RuntimeException e) {
-            throw new CustomException("Renovations exits", ErrorCode.Failed);
+            throw new CustomException("Cannot delete device: renovations exist", ErrorCode.Failed);
         }
     }
 
-    public void addAnonymousDevice(DeviceCreateVO device) {
+    public Device addAnonymousDevice(DeviceCreateVO device) {
         alreadyExist(device.deviceSerialNumber());
         try {
             Passport passport = passportService.findPassportBySerialId(device.deviceSerialNumber());
@@ -95,7 +102,8 @@ public class DeviceService {
             deviceToAdd.setPurchaseDate(device.purchaseDate());
             deviceToAdd.setPassport(passport);
             deviceToAdd.setWarrantyExpirationDate(device.purchaseDate().plusMonths(passport.getWarrantyMonths()));
-            deviceRepository.save(deviceToAdd);
+
+            return deviceRepository.save(deviceToAdd);
         } catch (RuntimeException e) {
             throw new CustomException("Invalid serial number", ErrorCode.Failed);
         }

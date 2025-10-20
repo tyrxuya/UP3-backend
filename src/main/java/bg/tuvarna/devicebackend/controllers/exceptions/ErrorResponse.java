@@ -1,4 +1,4 @@
-package bg.tuvarna.devicebackend.controllers.execptions;
+package bg.tuvarna.devicebackend.controllers.exceptions;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

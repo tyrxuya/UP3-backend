@@ -1,8 +1,8 @@
 package bg.tuvarna.devicebackend.config;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorCode;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorResponse;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorCode;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorResponse;
 import bg.tuvarna.devicebackend.models.dtos.AuthResponseDTO;
 import bg.tuvarna.devicebackend.models.dtos.UserLoginDTO;
 import bg.tuvarna.devicebackend.models.dtos.UserVO;

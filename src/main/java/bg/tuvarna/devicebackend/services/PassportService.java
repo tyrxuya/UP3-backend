@@ -1,8 +1,9 @@
 package bg.tuvarna.devicebackend.services;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorCode;
-import bg.tuvarna.devicebackend.models.dtos.PassportVO;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorCode;
+import bg.tuvarna.devicebackend.models.dtos.PassportCreateVO;
+import bg.tuvarna.devicebackend.models.dtos.PassportUpdateVO;
 import bg.tuvarna.devicebackend.models.entities.Passport;
 import bg.tuvarna.devicebackend.models.mappers.PassportMapper;
 import bg.tuvarna.devicebackend.repositories.PassportRepository;
@@ -20,21 +21,36 @@ import java.util.Objects;
 public class PassportService {
     private final PassportRepository passportRepository;
 
-    public void save(PassportVO passportVO) {
-        Passport passport;
-        List<Passport> passports = passportRepository.findByFromSerialNumberBetween(passportVO.serialPrefix(), passportVO.fromSerialNumber(), passportVO.toSerialNumber());
-        if (passportVO.id() == null) {
-            if (!passports.isEmpty())
-                throw new CustomException("Serial number already exists", ErrorCode.AlreadyExists);
-            passport = PassportMapper.toEntity(passportVO);
-        } else {
-            passport = findPassportById(passportVO.id());
-            if (!passports.isEmpty() && passports.stream().anyMatch(p -> !Objects.equals(p.getId(), passport.getId())))
-                throw new CustomException("Serial number already exists", ErrorCode.AlreadyExists);
-            PassportMapper.updateEntity(passport, passportVO);
+    public Passport create(PassportCreateVO passportCreateVO) {
+        List<Passport> passports = passportRepository.findByFromSerialNumberBetween(passportCreateVO.serialPrefix(), passportCreateVO.fromSerialNumber(), passportCreateVO.toSerialNumber());
+        if (!passports.isEmpty()) {
+            throw new CustomException("Serial number already exists", ErrorCode.AlreadyExists);
         }
 
-        passportRepository.save(passport);
+        Passport passport = PassportMapper.toEntity(passportCreateVO);
+
+        return passportRepository.save(passport);
+    }
+
+    public Passport update(Long id, PassportUpdateVO passportUpdateVO) {
+        Passport passport = findPassportById(id);
+
+        if (passport == null) {
+            throw new CustomException("Passport not found", ErrorCode.EntityNotFound);
+        }
+
+        String serialPrefix = passportUpdateVO.serialPrefix() != null ? passportUpdateVO.serialPrefix() : passport.getSerialPrefix();
+        int fromSerialNumber = passportUpdateVO.fromSerialNumber() != null ? passportUpdateVO.fromSerialNumber() : passport.getFromSerialNumber();
+        int toSerialNumber = passportUpdateVO.toSerialNumber() != null ? passportUpdateVO.toSerialNumber() : passport.getToSerialNumber();
+
+        List<Passport> passports = passportRepository.findByFromSerialNumberBetween(serialPrefix, fromSerialNumber, toSerialNumber);
+        if (!passports.isEmpty() && passports.stream().anyMatch(p -> !Objects.equals(p.getId(), passport.getId()))) {
+            throw new CustomException("Serial number already exists", ErrorCode.AlreadyExists);
+        }
+
+        PassportMapper.updateEntity(passport, passportUpdateVO);
+
+        return passportRepository.save(passport);
     }
 
     public Passport findPassportById(Long id) {
@@ -43,6 +59,7 @@ public class PassportService {
 
     public Passport findPassportBySerialId(String serialId) {
         List<Passport> passports = getPassportsBySerialPrefix(serialId);
+        
         for (Passport passport : passports) {
             int serialNumber;
             try {
@@ -54,6 +71,7 @@ public class PassportService {
                 return passport;
             }
         }
+
         throw new CustomException("Passport not found for serial number: " + serialId, ErrorCode.Failed);
     }
 

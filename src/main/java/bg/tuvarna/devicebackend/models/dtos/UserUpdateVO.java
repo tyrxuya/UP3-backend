@@ -3,7 +3,6 @@ package bg.tuvarna.devicebackend.models.dtos;
 import bg.tuvarna.devicebackend.annotations.ValidEmail;
 
 public record UserUpdateVO(
-        Long id,
         String fullName,
         String address,
         String phone,

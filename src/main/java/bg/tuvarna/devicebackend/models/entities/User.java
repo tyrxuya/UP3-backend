@@ -8,7 +8,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -33,9 +32,9 @@ public class User implements UserDetails {
     private UserRole role;
 
     @OneToMany(mappedBy = "user", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-    private List<Device> devices = new ArrayList<>();
+    private List<Device> devices;
 
-    public User (UserCreateVO vo){
+    public User(UserCreateVO vo) {
         this.fullName = vo.fullName();
         this.address = vo.address();
         this.phone = vo.phone();
@@ -55,7 +54,9 @@ public class User implements UserDetails {
 
 
     @Override
-    public String getPassword() {return password;}
+    public String getPassword() {
+        return password;
+    }
 
     @Override
     public boolean isAccountNonExpired() {

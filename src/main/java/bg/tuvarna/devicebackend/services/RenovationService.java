@@ -13,7 +13,7 @@ public class RenovationService {
     private final RenovationRepository renovationRepository;
     private final DeviceService deviceService;
 
-    public void save(RenovationCreateVO vo) {
+    public Renovation save(RenovationCreateVO vo) {
         Device device = deviceService.isDeviceExists(vo.deviceSerialNumber());
 
         Renovation renovation = new Renovation();
@@ -21,6 +21,6 @@ public class RenovationService {
         renovation.setDescription(vo.description());
         renovation.setRenovationDate(vo.renovationDate());
 
-        renovationRepository.save(renovation);
+        return renovationRepository.save(renovation);
     }
 }

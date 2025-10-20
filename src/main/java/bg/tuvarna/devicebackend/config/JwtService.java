@@ -1,7 +1,7 @@
 package bg.tuvarna.devicebackend.config;
 
-import bg.tuvarna.devicebackend.controllers.execptions.CustomException;
-import bg.tuvarna.devicebackend.controllers.execptions.ErrorCode;
+import bg.tuvarna.devicebackend.controllers.exceptions.CustomException;
+import bg.tuvarna.devicebackend.controllers.exceptions.ErrorCode;
 import bg.tuvarna.devicebackend.models.entities.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
