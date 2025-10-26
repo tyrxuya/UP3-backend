@@ -23,7 +23,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_URL=${POSTGRES_URL}
     ports:
-      - 8000:8080
+      - 9000:9000
     depends_on:
       - postgres
     networks:
