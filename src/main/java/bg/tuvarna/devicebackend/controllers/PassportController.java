@@ -101,6 +101,16 @@ public class PassportController {
         return ResponseEntity.ok().build();
     }
 
+
+    @Operation(
+            description = "Get passport by id",
+            summary = "Get passport by id"
+    )
+    @GetMapping("/{id}")
+    public ResponseEntity<PassportVO> getPassportById(@PathVariable Long id) {
+        return ResponseEntity.ok(new PassportVO(passportService.findPassportById(id)));
+    }
+
     @Operation(
             description = "Get passport by serialId",
             summary = "Get passport by serialId"
